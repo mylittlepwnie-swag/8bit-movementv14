@@ -1,5 +1,16 @@
 Change Log for Token Movement 8-bit Style.
 
+1.4.1:
+    -Fixed the module namespace: scripts now use the canonical module id
+    "8bit-movement-frankhz" for settings, token flags, and libWrapper. On
+    Foundry v13/v14 the old "8bit-movement" scope threw "Flag scope is not
+    valid or not currently active" and libWrapper rejected registration,
+    which broke the Token HUD/Config UI entirely.
+    -Updated the image picker to foundry.applications.apps.FilePicker for v14
+    (the global FilePicker was removed).
+    -Inject the directional-image UI on prototype tokens via the v13+
+    renderPrototypeTokenConfig hook.
+
 1.0.2:
 
     -Added a mechanic that recognizes the key words UP DOWN LEFT RIGHT (or lowercase) in your file name.
