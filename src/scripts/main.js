@@ -54,3 +54,9 @@ Hooks.on("renderTokenHUD", async function (sheet, element) {
 Hooks.on("renderTokenConfig", async function (sheet, element) {
   createConfigButtons(sheet, element);
 });
+
+// v13+ opens prototype token setup in a separate PrototypeTokenConfig app, which
+// fires its own render hook rather than renderTokenConfig.
+Hooks.on("renderPrototypeTokenConfig", async function (sheet, element) {
+  createConfigButtons(sheet, element);
+});
