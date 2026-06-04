@@ -156,7 +156,12 @@ export async function initializeMovement(tokenId) {
  */
 export async function imageLoader(tokenId, sheet, direction) {
   const token = canvas.tokens.get(tokenId);
-  const pickedFile = await new FilePicker({
+  // v13 namespaced FilePicker and v14 removed the deprecated global, so resolve
+  // the implementation from the new location and fall back to the global on v12.
+  const FilePickerImpl =
+    foundry.applications?.apps?.FilePicker?.implementation ??
+    globalThis.FilePicker;
+  const pickedFile = await new FilePickerImpl({
     type: "imagevideo",
     callback: async (path) => {
       await token.document.setFlag(MODULE_NAME, direction, path);
