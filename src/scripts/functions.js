@@ -1,4 +1,4 @@
-export const MODULE_NAME = "8bit-movement";
+export const MODULE_NAME = "8bit-movement-frankhz";
 const __8bitPersistTimers = new Map();
 
 function __8bit_forceOpaque(placeable) {
@@ -229,7 +229,7 @@ export async function addListener() {
         if (token.texture.src === token.flags[MODULE_NAME].up) return;
         foundry.utils.setProperty(
           change,
-          "flags.8bit-movement.__nextTexture",
+          "flags.8bit-movement-frankhz.__nextTexture",
           token.flags[MODULE_NAME].up,
         );
         __8bit_previewMesh(token.id, token.flags[MODULE_NAME].up);
@@ -238,7 +238,7 @@ export async function addListener() {
         if (token.texture.src === token.flags[MODULE_NAME].down) return;
         foundry.utils.setProperty(
           change,
-          "flags.8bit-movement.__nextTexture",
+          "flags.8bit-movement-frankhz.__nextTexture",
           token.flags[MODULE_NAME].down,
         );
         __8bit_previewMesh(token.id, token.flags[MODULE_NAME].down);
@@ -247,7 +247,7 @@ export async function addListener() {
         if (token.texture.src === token.flags[MODULE_NAME].left) return;
         foundry.utils.setProperty(
           change,
-          "flags.8bit-movement.__nextTexture",
+          "flags.8bit-movement-frankhz.__nextTexture",
           token.flags[MODULE_NAME].left,
         );
         __8bit_previewMesh(token.id, token.flags[MODULE_NAME].left);
@@ -256,7 +256,7 @@ export async function addListener() {
         if (token.texture.src === token.flags[MODULE_NAME].right) return;
         foundry.utils.setProperty(
           change,
-          "flags.8bit-movement.__nextTexture",
+          "flags.8bit-movement-frankhz.__nextTexture",
           token.flags[MODULE_NAME].right,
         );
         __8bit_previewMesh(token.id, token.flags[MODULE_NAME].right);
@@ -265,7 +265,7 @@ export async function addListener() {
         if (token.texture.src === token.flags[MODULE_NAME].UL) return;
         foundry.utils.setProperty(
           change,
-          "flags.8bit-movement.__nextTexture",
+          "flags.8bit-movement-frankhz.__nextTexture",
           token.flags[MODULE_NAME].UL,
         );
         __8bit_previewMesh(token.id, token.flags[MODULE_NAME].UL);
@@ -274,7 +274,7 @@ export async function addListener() {
         if (token.texture.src === token.flags[MODULE_NAME].UR) return;
         foundry.utils.setProperty(
           change,
-          "flags.8bit-movement.__nextTexture",
+          "flags.8bit-movement-frankhz.__nextTexture",
           token.flags[MODULE_NAME].UR,
         );
         __8bit_previewMesh(token.id, token.flags[MODULE_NAME].UR);
@@ -283,7 +283,7 @@ export async function addListener() {
         if (token.texture.src === token.flags[MODULE_NAME].DL) return;
         foundry.utils.setProperty(
           change,
-          "flags.8bit-movement.__nextTexture",
+          "flags.8bit-movement-frankhz.__nextTexture",
           token.flags[MODULE_NAME].DL,
         );
         __8bit_previewMesh(token.id, token.flags[MODULE_NAME].DL);
@@ -292,7 +292,7 @@ export async function addListener() {
         if (token.texture.src === token.flags[MODULE_NAME].DR) return;
         foundry.utils.setProperty(
           change,
-          "flags.8bit-movement.__nextTexture",
+          "flags.8bit-movement-frankhz.__nextTexture",
           token.flags[MODULE_NAME].DR,
         );
         __8bit_previewMesh(token.id, token.flags[MODULE_NAME].DR);
@@ -303,7 +303,7 @@ export async function addListener() {
           if (token.texture.src === token.flags[MODULE_NAME].down) return;
           foundry.utils.setProperty(
             change,
-            "flags.8bit-movement.__nextTexture",
+            "flags.8bit-movement-frankhz.__nextTexture",
             token.flags[MODULE_NAME].down,
           );
           __8bit_previewMesh(token.id, token.flags[MODULE_NAME].down);
@@ -312,7 +312,7 @@ export async function addListener() {
           if (token.texture.src === token.flags[MODULE_NAME].left) return;
           foundry.utils.setProperty(
             change,
-            "flags.8bit-movement.__nextTexture",
+            "flags.8bit-movement-frankhz.__nextTexture",
             token.flags[MODULE_NAME].left,
           );
           __8bit_previewMesh(token.id, token.flags[MODULE_NAME].left);
@@ -321,7 +321,7 @@ export async function addListener() {
           if (token.texture.src === token.flags[MODULE_NAME].up) return;
           foundry.utils.setProperty(
             change,
-            "flags.8bit-movement.__nextTexture",
+            "flags.8bit-movement-frankhz.__nextTexture",
             token.flags[MODULE_NAME].up,
           );
           __8bit_previewMesh(token.id, token.flags[MODULE_NAME].up);
@@ -330,7 +330,7 @@ export async function addListener() {
           if (token.texture.src === token.flags[MODULE_NAME].right) return;
           foundry.utils.setProperty(
             change,
-            "flags.8bit-movement.__nextTexture",
+            "flags.8bit-movement-frankhz.__nextTexture",
             token.flags[MODULE_NAME].right,
           );
           __8bit_previewMesh(token.id, token.flags[MODULE_NAME].right);
@@ -351,9 +351,9 @@ Hooks.on("updateToken", async (doc, changes) => {
     // Transient flag set by preUpdateToken.
     const next =
       (changes?.flags &&
-        changes.flags["8bit-movement"] &&
-        changes.flags["8bit-movement"].__nextTexture) ||
-      doc.getFlag("8bit-movement", "__nextTexture");
+        changes.flags["8bit-movement-frankhz"] &&
+        changes.flags["8bit-movement-frankhz"].__nextTexture) ||
+      doc.getFlag("8bit-movement-frankhz", "__nextTexture");
 
     // Debounce persistence until movement settles to avoid jumps on drawn paths.
     if (next || "x" in changes || "y" in changes) {
@@ -361,12 +361,12 @@ Hooks.on("updateToken", async (doc, changes) => {
       if (prev) clearTimeout(prev);
       const handle = setTimeout(async () => {
         try {
-          const pending = doc.getFlag("8bit-movement", "__nextTexture");
+          const pending = doc.getFlag("8bit-movement-frankhz", "__nextTexture");
           if (pending) {
             await doc.update(
               {
                 "texture.src": pending,
-                "flags.8bit-movement.-=__nextTexture": null,
+                "flags.8bit-movement-frankhz.-=__nextTexture": null,
               },
               { animate: false },
             );

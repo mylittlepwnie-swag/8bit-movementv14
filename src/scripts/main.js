@@ -7,7 +7,7 @@ Hooks.on("init", () => {
 });
 
 Hooks.on("ready", async function () {
-  if (game.settings.get("8bit-movement", "disableRotationAnimation")) {
+  if (game.settings.get("8bit-movement-frankhz", "disableRotationAnimation")) {
     if (!globalThis.libWrapper) {
       console.warn(
         "8bit-movement: libWrapper is not active; rotation animation wrapper was not registered.",
@@ -15,7 +15,7 @@ Hooks.on("ready", async function () {
     } else {
       try {
         const wrapperId = libWrapper.register(
-          "8bit-movement",
+          "8bit-movement-frankhz",
           "Token.prototype.animate",
           function (wrapped, ...args) {
             const [attributes, options = {}] = args;
