@@ -67,13 +67,13 @@ function setSheetPosition(sheet) {
 
 async function clearPrototypeSettings(tokenDocument, image) {
   await game.actors.get(tokenDocument.actor.id).update({
-    "prototypeToken.flags.-=8bit-movement": null,
+    "prototypeToken.flags.-=8bit-movement-frankhz": null,
     "prototypeToken.texture.src": image,
     "prototypeToken.lockRotation": false,
   });
 
   await tokenDocument.update({
-    "flags.-=8bit-movement": null,
+    "flags.-=8bit-movement-frankhz": null,
     "texture.src": image,
     lockRotation: false,
     rotation: 0,
@@ -82,7 +82,7 @@ async function clearPrototypeSettings(tokenDocument, image) {
 
 async function savePrototypeSettings(tokenDocument, images) {
   await game.actors.get(tokenDocument.actor.id).update({
-    "prototypeToken.flags.8bit-movement": {
+    "prototypeToken.flags.8bit-movement-frankhz": {
       up: images.up,
       down: images.down,
       left: images.left,
