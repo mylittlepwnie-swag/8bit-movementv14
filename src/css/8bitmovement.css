@@ -49,6 +49,37 @@
     background: transparent;
 }
 
+#token-hud .outfit-selector-hud {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    margin: 8px 0;
+    pointer-events: all;
+}
+#token-hud .outfit-selector-label {
+    font-size: 12px;
+    color: var(--color-text-light-highlight, #f0f0e0);
+    text-shadow: 1px 1px 2px #000;
+    white-space: nowrap;
+}
+#token-hud .outfit-selector-select {
+    flex: 1;
+    min-width: 80px;
+    font-size: 12px;
+    color: var(--color-text-light-highlight, #f0f0e0);
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--color-border-light-tertiary, #777);
+    border-radius: 3px;
+    padding: 2px 4px;
+    pointer-events: all;
+    cursor: pointer;
+}
+#token-hud .outfit-selector-select option {
+    background: #1b1d24;
+    color: #f0f0e0;
+}
+
 .movement-settings {
     display: inline-flex;
     align-items: center;
