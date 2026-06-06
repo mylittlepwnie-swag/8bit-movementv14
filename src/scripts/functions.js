@@ -33,24 +33,39 @@ function __8bit_getActiveOutfitImages(tokenDoc) {
 
 /**
  * Pre-load all textures for the given outfit to avoid blur on first use.
+ * Uses Foundry's TextureLoader so images are actually fetched and decoded
+ * (PIXI.Texture.from alone does not decode synchronously).
  */
 async function __8bit_precacheOutfit(tokenDoc, outfitName) {
   const outfits = tokenDoc.getFlag(MODULE_NAME, "outfits") ?? {};
   const outfit = outfits[outfitName];
   if (!outfit) return;
 
-  for (const dir of ALL_DIRECTIONS) {
-    const src = outfit[dir];
-    if (src) {
+  const loader =
+    foundry.canvas?.TextureLoader?.loader ?? globalThis.TextureLoader?.loader;
+  const sources = ALL_DIRECTIONS.map((dir) => outfit[dir]).filter(Boolean);
+
+  await Promise.all(
+    sources.map(async (src) => {
       try {
-        if (typeof PIXI !== "undefined" && PIXI.Texture) {
-          PIXI.Texture.from(src);
+        if (loader?.loadTexture) {
+          await loader.loadTexture(src);
+        } else if (typeof loadTexture === "function") {
+          await loadTexture(src);
         }
       } catch (e) {
-        console.warn(`8bit-movement: failed to precache ${dir} for outfit ${outfitName}`, e);
+        console.warn(`8bit-movement: failed to precache ${src}`, e);
       }
-    }
+    }),
+  );
+}
+
+/** Find which direction key in an image set matches a given texture src. */
+function __8bit_findDirectionKey(images, src) {
+  for (const dir of ALL_DIRECTIONS) {
+    if (images[dir] && images[dir] === src) return dir;
   }
+  return null;
 }
 
 function __8bit_forceOpaque(placeable) {
@@ -152,11 +167,29 @@ export async function switchOutfit(tokenId, outfitName) {
   const token = canvas.tokens.get(tokenId);
   if (!token) return;
 
-  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
-  if (!outfits[outfitName]) return;
+  const doc = token.document;
+  const outfits = doc.getFlag(MODULE_NAME, "outfits") ?? {};
+  const newOutfit = outfits[outfitName];
+  if (!newOutfit) return;
 
-  await token.document.setFlag(MODULE_NAME, "currentOutfit", outfitName);
-  await __8bit_precacheOutfit(token.document, outfitName);
+  // Preserve the token's current facing: find which direction it is showing in
+  // the previously-active outfit, then use that same direction in the new one.
+  const prevImages = __8bit_getActiveOutfitImages(doc);
+  const facing = __8bit_findDirectionKey(prevImages, doc.texture.src) ?? "down";
+  const newSrc = newOutfit[facing] || newOutfit.down;
+
+  // Preload first so the swap is instant and sharp (no first-use blur).
+  await __8bit_precacheOutfit(doc, outfitName);
+
+  // Update the flag AND the displayed texture together so the sprite refreshes
+  // immediately instead of only on the next move.
+  await doc.update(
+    {
+      [`flags.${MODULE_NAME}.currentOutfit`]: outfitName,
+      ...(newSrc ? { "texture.src": newSrc } : {}),
+    },
+    { animate: false },
+  );
 }
 
 /**
@@ -249,6 +282,15 @@ export async function updateOutfitImage(tokenId, outfitName, direction, imagePat
     await __8bit_precacheOutfit(token.document, outfitName);
   }
 }
+
+// Warm the texture cache for every token's active outfit when a scene loads,
+// so the first outfit switch / movement is already sharp.
+Hooks.on("canvasReady", () => {
+  for (const placeable of canvas.tokens?.placeables ?? []) {
+    const outfitName = placeable.document.getFlag(MODULE_NAME, "currentOutfit");
+    if (outfitName) __8bit_precacheOutfit(placeable.document, outfitName);
+  }
+});
 
 /**
  * Open an image/video picker and save the selected path to a directional flag.
