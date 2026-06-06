@@ -1,4 +1,12 @@
-import { MODULE_NAME, imageLoader, initializeMovement } from "./functions.js";
+import {
+  MODULE_NAME,
+  imageLoader,
+  initializeMovement,
+  switchOutfit,
+  addOutfit,
+  removeOutfit,
+  renameOutfit,
+} from "./functions.js";
 
 const CARDINAL_DIRECTIONS = [
   { key: "up", action: "up-image", labelKey: "8BITMOVEMENT.up" },
@@ -57,6 +65,24 @@ function getDirectionalImages(tokenDocument, fallbackImage) {
   for (const direction of [...CARDINAL_DIRECTIONS, ...DIAGONAL_DIRECTIONS]) {
     images[direction.key] =
       tokenDocument.getFlag(MODULE_NAME, direction.key) || fallbackImage;
+  }
+  return images;
+}
+
+function getActiveOutfitImages(tokenDocument, fallbackImage) {
+  const currentOutfit = tokenDocument.getFlag(MODULE_NAME, "currentOutfit");
+  const outfits = tokenDocument.getFlag(MODULE_NAME, "outfits") ?? {};
+
+  const outfit = currentOutfit && outfits[currentOutfit] ? outfits[currentOutfit] : null;
+  const images = {};
+
+  for (const direction of [...CARDINAL_DIRECTIONS, ...DIAGONAL_DIRECTIONS]) {
+    if (outfit) {
+      images[direction.key] = outfit[direction.key] || fallbackImage;
+    } else {
+      images[direction.key] =
+        tokenDocument.getFlag(MODULE_NAME, direction.key) || fallbackImage;
+    }
   }
   return images;
 }
@@ -182,7 +208,10 @@ export async function createHudButtons(sheet, element) {
   }
 
   const fallbackImage = tokenDocument.texture?.src ?? token.actor?.img ?? "";
-  const images = getDirectionalImages(tokenDocument, fallbackImage);
+  const images = getActiveOutfitImages(tokenDocument, fallbackImage);
+  const outfits = tokenDocument.getFlag(MODULE_NAME, "outfits") ?? {};
+  const currentOutfit = tokenDocument.getFlag(MODULE_NAME, "currentOutfit");
+  const outfitList = Object.keys(outfits);
 
   appendActionButton(
     "lock-images",
@@ -194,13 +223,42 @@ export async function createHudButtons(sheet, element) {
     },
   );
 
+  // Outfit selector dropdown
+  if (outfitList.length > 1) {
+    const outfitSelectContainer = document.createElement("div");
+    outfitSelectContainer.className = "outfit-selector-hud";
+    outfitSelectContainer.style.cssText = "display: flex; align-items: center; gap: 4px; padding: 4px 0;";
+
+    const label = document.createElement("span");
+    label.textContent = "Outfit:";
+    label.style.fontSize = "12px";
+    outfitSelectContainer.append(label);
+
+    const select = document.createElement("select");
+    select.style.cssText = "flex: 1; font-size: 11px;";
+    for (const outfit of outfitList) {
+      const option = document.createElement("option");
+      option.value = outfit;
+      option.textContent = outfit;
+      option.selected = outfit === currentOutfit;
+      select.append(option);
+    }
+    select.addEventListener("change", async (e) => {
+      await switchOutfit(token.id, e.target.value);
+      sheet.render();
+    });
+    outfitSelectContainer.append(select);
+
+    imageBox.append(outfitSelectContainer);
+  }
+
   for (const direction of CARDINAL_DIRECTIONS) {
     appendImageButton(
       direction.action,
       localize(direction.labelKey),
       images[direction.key],
       async () => {
-        await imageLoader(token.id, sheet, direction.key);
+        await imageLoader(token.id, sheet, direction.key, currentOutfit);
       },
     );
   }
@@ -212,7 +270,7 @@ export async function createHudButtons(sheet, element) {
         localize(direction.labelKey),
         images[direction.key],
         async () => {
-          await imageLoader(token.id, sheet, direction.key);
+          await imageLoader(token.id, sheet, direction.key, currentOutfit);
         },
         direction.hudLabel,
       );
@@ -320,7 +378,7 @@ export async function createConfigButtons(sheet, element) {
     return input;
   };
 
-  const createImagePickerField = (id, title, src, direction) => {
+  const createImagePickerField = (id, title, src, direction, outfitName = null) => {
     const wrapper = document.createElement("div");
     wrapper.className = "movement-image-field";
     const inputId = `${id}-path`;
@@ -349,7 +407,7 @@ export async function createConfigButtons(sheet, element) {
     );
     browseButton.tabIndex = -1;
     browseButton.addEventListener("click", async () => {
-      await imageLoader(token.id, sheet, direction);
+      await imageLoader(token.id, sheet, direction, outfitName);
     });
 
     picker.append(input, browseButton);
@@ -365,7 +423,7 @@ export async function createConfigButtons(sheet, element) {
     previewImage.alt = title;
     previewButton.append(previewImage);
     previewButton.addEventListener("click", async () => {
-      await imageLoader(token.id, sheet, direction);
+      await imageLoader(token.id, sheet, direction, outfitName);
     });
 
     wrapper.append(picker, previewButton);
@@ -421,11 +479,154 @@ export async function createConfigButtons(sheet, element) {
     return;
   }
 
-  for (const direction of CARDINAL_DIRECTIONS) addImagePickerGroup(direction);
+  // Outfit management UI
+  const outfits = token.getFlag(MODULE_NAME, "outfits") ?? {};
+  const currentOutfit = token.getFlag(MODULE_NAME, "currentOutfit");
+  const outfitList = Object.keys(outfits);
 
-  if (game.settings.get(MODULE_NAME, "diagonalMode")) {
-    for (const direction of DIAGONAL_DIRECTIONS) {
-      addImagePickerGroup(direction);
+  if (outfitList.length > 0) {
+    // Outfit selector
+    const outfitSelectGroup = createFormGroup("Active Outfit");
+    const outfitSelectContainer = document.createElement("div");
+    outfitSelectContainer.style.cssText = "display: flex; gap: 8px;";
+
+    const outfitSelect = document.createElement("select");
+    outfitSelect.style.cssText = "flex: 1;";
+    for (const outfit of outfitList) {
+      const option = document.createElement("option");
+      option.value = outfit;
+      option.textContent = outfit;
+      option.selected = outfit === currentOutfit;
+      outfitSelect.append(option);
+    }
+    outfitSelect.addEventListener("change", async (e) => {
+      await switchOutfit(token.id, e.target.value);
+      sheet.render();
+    });
+    outfitSelectContainer.append(outfitSelect);
+
+    // Add outfit button
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "button";
+    addButton.textContent = "+";
+    addButton.style.cssText = "width: 32px;";
+    addButton.addEventListener("click", async () => {
+      let newName = "Outfit";
+      let counter = 1;
+      while (outfits[`${newName} ${counter}`]) counter++;
+      newName = `${newName} ${counter}`;
+
+      const name = await Dialog.confirm({
+        title: "New Outfit",
+        content: `<input type="text" id="outfit-name-input" value="${newName}" style="width: 100%; margin: 8px 0;">`,
+        yes: async () => {
+          const input = document.getElementById("outfit-name-input");
+          const finalName = input?.value.trim() || newName;
+          await addOutfit(token.id, finalName);
+          sheet.render();
+        },
+      });
+    });
+    outfitSelectContainer.append(addButton);
+    outfitSelectGroup.append(outfitSelectContainer);
+
+    // Show images for current outfit
+    if (currentOutfit && outfits[currentOutfit]) {
+      const outfitImages = outfits[currentOutfit];
+      for (const direction of CARDINAL_DIRECTIONS) {
+        const src = outfitImages[direction.key] || "";
+        createFormGroup(
+          localize(direction.labelKey),
+          `${uniquePrefix}-${direction.action}-path`,
+        ).append(
+          createImagePickerField(
+            `${uniquePrefix}-${direction.action}`,
+            localize(direction.labelKey),
+            src,
+            direction.key,
+            currentOutfit,
+          ),
+        );
+      }
+
+      if (game.settings.get(MODULE_NAME, "diagonalMode")) {
+        for (const direction of DIAGONAL_DIRECTIONS) {
+          const src = outfitImages[direction.key] || "";
+          createFormGroup(
+            localize(direction.labelKey),
+            `${uniquePrefix}-${direction.action}-path`,
+          ).append(
+            createImagePickerField(
+              `${uniquePrefix}-${direction.action}`,
+              localize(direction.labelKey),
+              src,
+              direction.key,
+              currentOutfit,
+            ),
+          );
+        }
+      }
+
+      // Outfit actions (rename, delete current outfit if not the only one)
+      const outfitActions = document.createElement("div");
+      outfitActions.className = "movement-actions";
+      outfitActions.style.cssText = "margin-top: 12px; border-top: 1px solid #ccc; padding-top: 12px;";
+
+      if (outfitList.length > 1) {
+        const deleteBtn = createActionButton(
+          "delete-outfit",
+          "Delete this outfit",
+          "fa-solid fa-trash",
+          "Delete Outfit",
+          async () => {
+            const confirmed = await Dialog.confirm({
+              title: "Delete Outfit",
+              content: `Delete outfit "${currentOutfit}"?`,
+              yes: async () => {
+                await removeOutfit(token.id, currentOutfit);
+                sheet.render();
+              },
+            });
+          },
+          "button",
+          "button",
+        );
+        outfitActions.append(deleteBtn);
+      }
+
+      const renameBtn = createActionButton(
+        "rename-outfit",
+        "Rename this outfit",
+        "fa-solid fa-pen",
+        "Rename",
+        async () => {
+          const newName = await Dialog.prompt({
+            title: "Rename Outfit",
+            content: `Enter new name for "${currentOutfit}":`,
+            label: "Outfit Name",
+            callback: (html) => html.querySelector("input[type='text']")?.value || "",
+            rejectClose: true,
+          });
+          if (newName && newName.trim()) {
+            await renameOutfit(token.id, currentOutfit, newName.trim());
+            sheet.render();
+          }
+        },
+        "button",
+        "button",
+      );
+      outfitActions.append(renameBtn);
+      fieldset.append(outfitActions);
+    }
+  } else {
+    // Fallback: if no outfits yet, show legacy images
+    for (const direction of CARDINAL_DIRECTIONS) addImagePickerGroup(direction);
+
+    if (game.settings.get(MODULE_NAME, "diagonalMode")) {
+      for (const direction of DIAGONAL_DIRECTIONS) {
+        addImagePickerGroup(direction);
+      }
     }
   }
 

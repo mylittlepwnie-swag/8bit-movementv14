@@ -1,6 +1,58 @@
 export const MODULE_NAME = "8bit-movement-frankhz";
 const __8bitPersistTimers = new Map();
 
+const DIRECTIONS = ["up", "down", "left", "right"];
+const DIAGONAL_DIRECTIONS = ["UL", "UR", "DL", "DR"];
+const ALL_DIRECTIONS = [...DIRECTIONS, ...DIAGONAL_DIRECTIONS];
+
+/**
+ * Get the current outfit name for a token, or null if using legacy single-image mode.
+ */
+function __8bit_getCurrentOutfit(tokenDoc) {
+  return tokenDoc.getFlag(MODULE_NAME, "currentOutfit") ?? null;
+}
+
+/**
+ * Get all directional images for the active outfit (or legacy if no outfit selected).
+ */
+function __8bit_getActiveOutfitImages(tokenDoc) {
+  const currentOutfit = __8bit_getCurrentOutfit(tokenDoc);
+  const outfits = tokenDoc.getFlag(MODULE_NAME, "outfits") ?? {};
+
+  if (currentOutfit && outfits[currentOutfit]) {
+    return outfits[currentOutfit];
+  }
+
+  // Fallback to legacy top-level images
+  const images = {};
+  for (const dir of ALL_DIRECTIONS) {
+    images[dir] = tokenDoc.getFlag(MODULE_NAME, dir);
+  }
+  return images;
+}
+
+/**
+ * Pre-load all textures for the given outfit to avoid blur on first use.
+ */
+async function __8bit_precacheOutfit(tokenDoc, outfitName) {
+  const outfits = tokenDoc.getFlag(MODULE_NAME, "outfits") ?? {};
+  const outfit = outfits[outfitName];
+  if (!outfit) return;
+
+  for (const dir of ALL_DIRECTIONS) {
+    const src = outfit[dir];
+    if (src) {
+      try {
+        if (typeof PIXI !== "undefined" && PIXI.Texture) {
+          PIXI.Texture.from(src);
+        }
+      } catch (e) {
+        console.warn(`8bit-movement: failed to precache ${dir} for outfit ${outfitName}`, e);
+      }
+    }
+  }
+}
+
 function __8bit_forceOpaque(placeable) {
   try {
     if (!placeable) return;
@@ -61,91 +113,141 @@ export async function initializeMovement(tokenId) {
     directions = directions.concat(
       isLowerCase ? ["ul", "ur", "dl", "dr"] : ["UL", "UR", "DL", "DR"],
     );
+
+  const outfitImages = {};
   if (!hasDirection) {
-    await token.document.setFlag(MODULE_NAME, "up", token.document.texture.src);
-    await token.document.setFlag(
-      MODULE_NAME,
-      "down",
-      token.document.texture.src,
-    );
-    await token.document.setFlag(
-      MODULE_NAME,
-      "left",
-      token.document.texture.src,
-    );
-    await token.document.setFlag(
-      MODULE_NAME,
-      "right",
-      token.document.texture.src,
-    );
-    if (diagonalMode) {
-      await token.document.setFlag(
-        MODULE_NAME,
-        "UL",
-        token.document.texture.src,
-      );
-      await token.document.setFlag(
-        MODULE_NAME,
-        "UR",
-        token.document.texture.src,
-      );
-      await token.document.setFlag(
-        MODULE_NAME,
-        "DL",
-        token.document.texture.src,
-      );
-      await token.document.setFlag(
-        MODULE_NAME,
-        "DR",
-        token.document.texture.src,
-      );
+    for (const dir of ALL_DIRECTIONS) {
+      outfitImages[dir] = token.document.texture.src;
     }
   } else {
-    await token.document.setFlag(
-      MODULE_NAME,
-      "up",
-      token.document.texture.src.replace(hasDirection, directions[0]),
-    );
-    await token.document.setFlag(
-      MODULE_NAME,
-      "down",
-      token.document.texture.src.replace(hasDirection, directions[1]),
-    );
-    await token.document.setFlag(
-      MODULE_NAME,
-      "left",
-      token.document.texture.src.replace(hasDirection, directions[2]),
-    );
-    await token.document.setFlag(
-      MODULE_NAME,
-      "right",
-      token.document.texture.src.replace(hasDirection, directions[3]),
-    );
+    outfitImages.up = token.document.texture.src.replace(hasDirection, directions[0]);
+    outfitImages.down = token.document.texture.src.replace(hasDirection, directions[1]);
+    outfitImages.left = token.document.texture.src.replace(hasDirection, directions[2]);
+    outfitImages.right = token.document.texture.src.replace(hasDirection, directions[3]);
     if (diagonalMode) {
-      await token.document.setFlag(
-        MODULE_NAME,
-        "UL",
-        token.document.texture.src.replace(hasDirection, directions[8]),
-      );
-      await token.document.setFlag(
-        MODULE_NAME,
-        "UR",
-        token.document.texture.src.replace(hasDirection, directions[9]),
-      );
-      await token.document.setFlag(
-        MODULE_NAME,
-        "DL",
-        token.document.texture.src.replace(hasDirection, directions[10]),
-      );
-      await token.document.setFlag(
-        MODULE_NAME,
-        "DR",
-        token.document.texture.src.replace(hasDirection, directions[11]),
-      );
+      outfitImages.UL = token.document.texture.src.replace(hasDirection, directions[8]);
+      outfitImages.UR = token.document.texture.src.replace(hasDirection, directions[9]);
+      outfitImages.DL = token.document.texture.src.replace(hasDirection, directions[10]);
+      outfitImages.DR = token.document.texture.src.replace(hasDirection, directions[11]);
     }
   }
 
-  await token.document.update({ lockRotation: true, rotation: 1 });
+  // Store as the "Default" outfit and set it as current
+  await token.document.update({
+    [`flags.${MODULE_NAME}.outfits`]: { Default: outfitImages },
+    [`flags.${MODULE_NAME}.currentOutfit`]: "Default",
+    lockRotation: true,
+    rotation: 1,
+  });
+
+  await __8bit_precacheOutfit(token.document, "Default");
+}
+
+/**
+ * Switch to a different outfit and precache its textures.
+ * @param {string} tokenId Token ID.
+ * @param {string} outfitName Outfit name to switch to.
+ */
+export async function switchOutfit(tokenId, outfitName) {
+  const token = canvas.tokens.get(tokenId);
+  if (!token) return;
+
+  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  if (!outfits[outfitName]) return;
+
+  await token.document.setFlag(MODULE_NAME, "currentOutfit", outfitName);
+  await __8bit_precacheOutfit(token.document, outfitName);
+}
+
+/**
+ * Create a new outfit with empty direction images.
+ * @param {string} tokenId Token ID.
+ * @param {string} outfitName New outfit name.
+ */
+export async function addOutfit(tokenId, outfitName) {
+  const token = canvas.tokens.get(tokenId);
+  if (!token) return;
+
+  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  if (outfits[outfitName]) return; // Already exists
+
+  const newOutfit = {};
+  for (const dir of ALL_DIRECTIONS) {
+    newOutfit[dir] = "";
+  }
+  outfits[outfitName] = newOutfit;
+
+  await token.document.setFlag(MODULE_NAME, "outfits", outfits);
+}
+
+/**
+ * Remove an outfit.
+ * @param {string} tokenId Token ID.
+ * @param {string} outfitName Outfit to remove.
+ */
+export async function removeOutfit(tokenId, outfitName) {
+  const token = canvas.tokens.get(tokenId);
+  if (!token) return;
+
+  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  delete outfits[outfitName];
+
+  // If we were on this outfit, switch to the first remaining one
+  const current = token.document.getFlag(MODULE_NAME, "currentOutfit");
+  if (current === outfitName) {
+    const remaining = Object.keys(outfits)[0] ?? null;
+    await token.document.setFlag(MODULE_NAME, "currentOutfit", remaining);
+  }
+
+  await token.document.setFlag(MODULE_NAME, "outfits", outfits);
+}
+
+/**
+ * Rename an outfit.
+ * @param {string} tokenId Token ID.
+ * @param {string} oldName Current outfit name.
+ * @param {string} newName New outfit name.
+ */
+export async function renameOutfit(tokenId, oldName, newName) {
+  const token = canvas.tokens.get(tokenId);
+  if (!token) return;
+
+  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  if (!outfits[oldName] || outfits[newName]) return; // Invalid state
+
+  outfits[newName] = outfits[oldName];
+  delete outfits[oldName];
+
+  // If we were on this outfit, update the current
+  const current = token.document.getFlag(MODULE_NAME, "currentOutfit");
+  if (current === oldName) {
+    await token.document.setFlag(MODULE_NAME, "currentOutfit", newName);
+  }
+
+  await token.document.setFlag(MODULE_NAME, "outfits", outfits);
+}
+
+/**
+ * Update a specific direction image in an outfit.
+ * @param {string} tokenId Token ID.
+ * @param {string} outfitName Outfit name.
+ * @param {string} direction Direction key (up, down, etc.).
+ * @param {string} imagePath New image path.
+ */
+export async function updateOutfitImage(tokenId, outfitName, direction, imagePath) {
+  const token = canvas.tokens.get(tokenId);
+  if (!token) return;
+
+  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  if (!outfits[outfitName]) return;
+
+  outfits[outfitName][direction] = imagePath;
+  await token.document.setFlag(MODULE_NAME, "outfits", outfits);
+
+  // Precache if this is the active outfit
+  if (token.document.getFlag(MODULE_NAME, "currentOutfit") === outfitName) {
+    await __8bit_precacheOutfit(token.document, outfitName);
+  }
 }
 
 /**
@@ -153,8 +255,9 @@ export async function initializeMovement(tokenId) {
  * @param {string} tokenId Token ID to configure.
  * @param {object} sheet Token HUD or Token Config sheet to re-render.
  * @param {string} direction Directional flag key to update.
+ * @param {string} outfitName Optional outfit name; if provided, updates the outfit instead of legacy flags.
  */
-export async function imageLoader(tokenId, sheet, direction) {
+export async function imageLoader(tokenId, sheet, direction, outfitName) {
   const token = canvas.tokens.get(tokenId);
   // v13 namespaced FilePicker and v14 removed the deprecated global, so resolve
   // the implementation from the new location and fall back to the global on v12.
@@ -164,7 +267,11 @@ export async function imageLoader(tokenId, sheet, direction) {
   const pickedFile = await new FilePickerImpl({
     type: "imagevideo",
     callback: async (path) => {
-      await token.document.setFlag(MODULE_NAME, direction, path);
+      if (outfitName) {
+        await updateOutfitImage(tokenId, outfitName, direction, path);
+      } else {
+        await token.document.setFlag(MODULE_NAME, direction, path);
+      }
       sheet.render();
     },
   });
@@ -184,11 +291,13 @@ export async function addListener() {
   const diagonalMode = game.settings.get(MODULE_NAME, "diagonalMode");
   Hooks.on("preUpdateToken", function changeImage(token, change) {
     if (!token.flags[MODULE_NAME]) return;
+
+    const activeImages = __8bit_getActiveOutfitImages(token);
     if (
-      !token.getFlag(MODULE_NAME, "up") &&
-      !token.getFlag(MODULE_NAME, "down") &&
-      !token.getFlag(MODULE_NAME, "right") &&
-      !token.getFlag(MODULE_NAME, "left")
+      !activeImages.up &&
+      !activeImages.down &&
+      !activeImages.right &&
+      !activeImages.left
     ) {
       if (!game.settings.get(MODULE_NAME, "warnings"))
         ui.notifications.warn(
@@ -196,6 +305,7 @@ export async function addListener() {
         );
       return;
     }
+
     const move =
       foundry.utils.hasProperty(change, "x") ||
       foundry.utils.hasProperty(change, "y");
@@ -204,10 +314,10 @@ export async function addListener() {
       let direction = "";
       if (diagonalMode) {
         if (
-          !token.getFlag(MODULE_NAME, "UL") &&
-          !token.getFlag(MODULE_NAME, "UR") &&
-          !token.getFlag(MODULE_NAME, "DL") &&
-          !token.getFlag(MODULE_NAME, "DR")
+          !activeImages.UL &&
+          !activeImages.UR &&
+          !activeImages.DL &&
+          !activeImages.DR
         ) {
           if (!game.settings.get(MODULE_NAME, "warnings"))
             ui.notifications.warn(
@@ -230,118 +340,44 @@ export async function addListener() {
         if (token.y > change.y) direction = "up";
         if (token.y < change.y) direction = "down";
       }
-      if (direction === "up") {
-        if (token.texture.src === token.flags[MODULE_NAME].up) return;
+
+      const directionMap = {
+        up: "up",
+        down: "down",
+        left: "left",
+        right: "right",
+        "up-left": "UL",
+        "up-right": "UR",
+        "down-left": "DL",
+        "down-right": "DR",
+      };
+      const imageKey = directionMap[direction];
+      if (imageKey && activeImages[imageKey]) {
+        if (token.texture.src === activeImages[imageKey]) return;
         foundry.utils.setProperty(
           change,
           "flags.8bit-movement-frankhz.__nextTexture",
-          token.flags[MODULE_NAME].up,
+          activeImages[imageKey],
         );
-        __8bit_previewMesh(token.id, token.flags[MODULE_NAME].up);
-      }
-      if (direction === "down") {
-        if (token.texture.src === token.flags[MODULE_NAME].down) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          token.flags[MODULE_NAME].down,
-        );
-        __8bit_previewMesh(token.id, token.flags[MODULE_NAME].down);
-      }
-      if (direction === "left") {
-        if (token.texture.src === token.flags[MODULE_NAME].left) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          token.flags[MODULE_NAME].left,
-        );
-        __8bit_previewMesh(token.id, token.flags[MODULE_NAME].left);
-      }
-      if (direction === "right") {
-        if (token.texture.src === token.flags[MODULE_NAME].right) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          token.flags[MODULE_NAME].right,
-        );
-        __8bit_previewMesh(token.id, token.flags[MODULE_NAME].right);
-      }
-      if (direction === "up-left") {
-        if (token.texture.src === token.flags[MODULE_NAME].UL) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          token.flags[MODULE_NAME].UL,
-        );
-        __8bit_previewMesh(token.id, token.flags[MODULE_NAME].UL);
-      }
-      if (direction === "up-right") {
-        if (token.texture.src === token.flags[MODULE_NAME].UR) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          token.flags[MODULE_NAME].UR,
-        );
-        __8bit_previewMesh(token.id, token.flags[MODULE_NAME].UR);
-      }
-      if (direction === "down-left") {
-        if (token.texture.src === token.flags[MODULE_NAME].DL) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          token.flags[MODULE_NAME].DL,
-        );
-        __8bit_previewMesh(token.id, token.flags[MODULE_NAME].DL);
-      }
-      if (direction === "down-right") {
-        if (token.texture.src === token.flags[MODULE_NAME].DR) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          token.flags[MODULE_NAME].DR,
-        );
-        __8bit_previewMesh(token.id, token.flags[MODULE_NAME].DR);
+        __8bit_previewMesh(token.id, activeImages[imageKey]);
       }
     } else if (rotation) {
-      switch (foundry.utils.getProperty(change, "rotation")) {
-        case 0:
-          if (token.texture.src === token.flags[MODULE_NAME].down) return;
-          foundry.utils.setProperty(
-            change,
-            "flags.8bit-movement-frankhz.__nextTexture",
-            token.flags[MODULE_NAME].down,
-          );
-          __8bit_previewMesh(token.id, token.flags[MODULE_NAME].down);
-          break;
-        case 90:
-          if (token.texture.src === token.flags[MODULE_NAME].left) return;
-          foundry.utils.setProperty(
-            change,
-            "flags.8bit-movement-frankhz.__nextTexture",
-            token.flags[MODULE_NAME].left,
-          );
-          __8bit_previewMesh(token.id, token.flags[MODULE_NAME].left);
-          break;
-        case 180:
-          if (token.texture.src === token.flags[MODULE_NAME].up) return;
-          foundry.utils.setProperty(
-            change,
-            "flags.8bit-movement-frankhz.__nextTexture",
-            token.flags[MODULE_NAME].up,
-          );
-          __8bit_previewMesh(token.id, token.flags[MODULE_NAME].up);
-          break;
-        case 270:
-          if (token.texture.src === token.flags[MODULE_NAME].right) return;
-          foundry.utils.setProperty(
-            change,
-            "flags.8bit-movement-frankhz.__nextTexture",
-            token.flags[MODULE_NAME].right,
-          );
-          __8bit_previewMesh(token.id, token.flags[MODULE_NAME].right);
-          break;
-        default:
-          break;
+      const rotationMap = {
+        0: "down",
+        90: "left",
+        180: "up",
+        270: "right",
+      };
+      const rotKey = foundry.utils.getProperty(change, "rotation");
+      const imageKey = rotationMap[rotKey];
+      if (imageKey && activeImages[imageKey]) {
+        if (token.texture.src === activeImages[imageKey]) return;
+        foundry.utils.setProperty(
+          change,
+          "flags.8bit-movement-frankhz.__nextTexture",
+          activeImages[imageKey],
+        );
+        __8bit_previewMesh(token.id, activeImages[imageKey]);
       }
     }
   });
