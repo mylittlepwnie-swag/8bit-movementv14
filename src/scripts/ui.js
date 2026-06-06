@@ -227,15 +227,14 @@ export async function createHudButtons(sheet, element) {
   if (outfitList.length > 1) {
     const outfitSelectContainer = document.createElement("div");
     outfitSelectContainer.className = "outfit-selector-hud";
-    outfitSelectContainer.style.cssText = "display: flex; align-items: center; gap: 4px; padding: 4px 0;";
 
     const label = document.createElement("span");
+    label.className = "outfit-selector-label";
     label.textContent = "Outfit:";
-    label.style.fontSize = "12px";
     outfitSelectContainer.append(label);
 
     const select = document.createElement("select");
-    select.style.cssText = "flex: 1; font-size: 11px;";
+    select.className = "outfit-selector-select";
     for (const outfit of outfitList) {
       const option = document.createElement("option");
       option.value = outfit;
@@ -243,7 +242,13 @@ export async function createHudButtons(sheet, element) {
       option.selected = outfit === currentOutfit;
       select.append(option);
     }
+    // The Token HUD sits over the canvas, so stop pointer events from bubbling
+    // down to the canvas (which would deselect the token / close the HUD).
+    for (const evt of ["pointerdown", "mousedown", "click"]) {
+      select.addEventListener(evt, (e) => e.stopPropagation());
+    }
     select.addEventListener("change", async (e) => {
+      e.stopPropagation();
       await switchOutfit(token.id, e.target.value);
       sheet.render();
     });
