@@ -1,5 +1,6 @@
 export const MODULE_NAME = "8bit-movement-frankhz";
 const __8bitPersistTimers = new Map();
+const __8bitScaleModes = new Map();
 
 const DIRECTIONS = ["up", "down", "left", "right"];
 const DIAGONAL_DIRECTIONS = ["UL", "UR", "DL", "DR"];
@@ -79,22 +80,93 @@ function __8bit_forceOpaque(placeable) {
   }
 }
 
+/**
+ * Reapply the token's remembered base-texture filtering (e.g. nearest-neighbour
+ * applied by a pixel-art module) after a texture swap replaced the base texture.
+ */
+function __8bit_reapplyScaleMode(tokenId) {
+  try {
+    const pl = canvas?.tokens?.get(tokenId);
+    const scaleMode = __8bitScaleModes.get(tokenId);
+    const base = (pl?.mesh ?? pl?.icon)?.texture?.baseTexture;
+    if (!base || scaleMode === undefined || base.scaleMode === scaleMode) return;
+    if (typeof base.setStyle === "function") base.setStyle(scaleMode);
+    else base.scaleMode = scaleMode;
+    base.update?.();
+  } catch {}
+}
+
 /** Preview a texture on the canvas token without writing to the Token document. */
 function __8bit_previewMesh(tokenId, src) {
   try {
     const pl = canvas?.tokens?.get(tokenId);
     if (!pl || !src) return;
-    const tex =
-      typeof PIXI !== "undefined" && PIXI.Texture
-        ? PIXI.Texture.from(src)
-        : null;
+    // Prefer Foundry's texture cache (filled by our precache) so the swapped-in
+    // texture is already decoded and shares the base texture Foundry draws with.
+    const getTex = foundry.canvas?.getTexture ?? globalThis.getTexture;
+    let tex = null;
+    try {
+      tex = getTex?.(src) ?? null;
+    } catch {}
+    if (!tex) {
+      tex =
+        typeof PIXI !== "undefined" && PIXI.Texture
+          ? PIXI.Texture.from(src)
+          : null;
+    }
     if (!tex) return;
+    // Freshly created textures default to linear (smooth) filtering, which
+    // blurs pixel art until the asset is reloaded. Carry the token's current
+    // filtering over to the new texture so the swap keeps the same style.
+    const currentBase = (pl.mesh ?? pl.icon)?.texture?.baseTexture;
+    if (currentBase && currentBase.scaleMode !== undefined) {
+      __8bitScaleModes.set(tokenId, currentBase.scaleMode);
+    }
+    const scaleMode = __8bitScaleModes.get(tokenId);
+    if (
+      tex.baseTexture &&
+      scaleMode !== undefined &&
+      tex.baseTexture.scaleMode !== scaleMode
+    ) {
+      if (typeof tex.baseTexture.setStyle === "function")
+        tex.baseTexture.setStyle(scaleMode);
+      else tex.baseTexture.scaleMode = scaleMode;
+      tex.baseTexture.update?.();
+    }
     if (pl.mesh) pl.mesh.texture = tex;
     else if (pl.icon) pl.icon.texture = tex;
     __8bit_forceOpaque(pl);
   } catch {
     // Preview failures are non-fatal; the persisted document update still runs.
   }
+}
+
+/**
+ * Queue a directional texture swap on a pending token update.
+ * Compares against the effective texture (pending preview if one exists,
+ * otherwise the persisted source) so quick direction changes inside the
+ * persist debounce window are not skipped as "already showing".
+ */
+function __8bit_queueTextureSwap(tokenDoc, change, src) {
+  const pending = tokenDoc.getFlag(MODULE_NAME, "__nextTexture") ?? null;
+  const effective = pending ?? tokenDoc.texture.src;
+  if (effective === src) return;
+  if (src === tokenDoc.texture.src) {
+    // Facing returned to the persisted texture: drop the stale pending swap
+    // so it cannot overwrite the correct facing when the debounce fires.
+    foundry.utils.setProperty(
+      change,
+      `flags.${MODULE_NAME}.-=__nextTexture`,
+      null,
+    );
+  } else {
+    foundry.utils.setProperty(
+      change,
+      `flags.${MODULE_NAME}.__nextTexture`,
+      src,
+    );
+  }
+  __8bit_previewMesh(tokenDoc.id, src);
 }
 
 /**
@@ -353,6 +425,11 @@ export async function addListener() {
       foundry.utils.hasProperty(change, "y");
     const rotation = foundry.utils.hasProperty(change, "rotation");
     if (move) {
+      // A straight-line move only includes the axis that changed, so fall back
+      // to the current position for the missing axis instead of comparing
+      // against undefined (which computed no direction in diagonal mode).
+      const newX = change.x ?? token.x;
+      const newY = change.y ?? token.y;
       let direction = "";
       if (diagonalMode) {
         if (
@@ -367,20 +444,20 @@ export async function addListener() {
             );
           return;
         }
-        if (token.x === change.x && token.y === change.y) return;
-        if (token.x > change.x && token.y === change.y) direction = "left";
-        if (token.x < change.x && token.y === change.y) direction = "right";
-        if (token.y > change.y && token.x === change.x) direction = "up";
-        if (token.y < change.y && token.x === change.x) direction = "down";
-        if (token.x > change.x && token.y > change.y) direction = "up-left";
-        if (token.x < change.x && token.y > change.y) direction = "up-right";
-        if (token.x > change.x && token.y < change.y) direction = "down-left";
-        if (token.x < change.x && token.y < change.y) direction = "down-right";
+        if (token.x === newX && token.y === newY) return;
+        if (token.x > newX && token.y === newY) direction = "left";
+        if (token.x < newX && token.y === newY) direction = "right";
+        if (token.y > newY && token.x === newX) direction = "up";
+        if (token.y < newY && token.x === newX) direction = "down";
+        if (token.x > newX && token.y > newY) direction = "up-left";
+        if (token.x < newX && token.y > newY) direction = "up-right";
+        if (token.x > newX && token.y < newY) direction = "down-left";
+        if (token.x < newX && token.y < newY) direction = "down-right";
       } else {
-        if (token.x > change.x) direction = "left";
-        if (token.x < change.x) direction = "right";
-        if (token.y > change.y) direction = "up";
-        if (token.y < change.y) direction = "down";
+        if (token.x > newX) direction = "left";
+        if (token.x < newX) direction = "right";
+        if (token.y > newY) direction = "up";
+        if (token.y < newY) direction = "down";
       }
 
       const directionMap = {
@@ -395,13 +472,7 @@ export async function addListener() {
       };
       const imageKey = directionMap[direction];
       if (imageKey && activeImages[imageKey]) {
-        if (token.texture.src === activeImages[imageKey]) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          activeImages[imageKey],
-        );
-        __8bit_previewMesh(token.id, activeImages[imageKey]);
+        __8bit_queueTextureSwap(token, change, activeImages[imageKey]);
       }
     } else if (rotation) {
       const rotationMap = {
@@ -413,13 +484,7 @@ export async function addListener() {
       const rotKey = foundry.utils.getProperty(change, "rotation");
       const imageKey = rotationMap[rotKey];
       if (imageKey && activeImages[imageKey]) {
-        if (token.texture.src === activeImages[imageKey]) return;
-        foundry.utils.setProperty(
-          change,
-          "flags.8bit-movement-frankhz.__nextTexture",
-          activeImages[imageKey],
-        );
-        __8bit_previewMesh(token.id, activeImages[imageKey]);
+        __8bit_queueTextureSwap(token, change, activeImages[imageKey]);
       }
     }
   });
@@ -457,7 +522,11 @@ Hooks.on("updateToken", async (doc, changes) => {
           const tk = canvas?.tokens?.get(doc.id);
           if (tk) {
             const kicks = [0, 48, 120, 240];
-            for (const t of kicks) setTimeout(() => __8bit_forceOpaque(tk), t);
+            for (const t of kicks)
+              setTimeout(() => {
+                __8bit_forceOpaque(tk);
+                __8bit_reapplyScaleMode(doc.id);
+              }, t);
           }
         } catch {}
         __8bitPersistTimers.delete(doc.id);
@@ -470,7 +539,11 @@ Hooks.on("updateToken", async (doc, changes) => {
     const swapped = !!next || (changes?.texture && "src" in changes.texture);
     if (movedNow || swapped) {
       const kicks = [0, 48, 120, 240];
-      for (const t of kicks) setTimeout(() => __8bit_forceOpaque(token), t);
+      for (const t of kicks)
+        setTimeout(() => {
+          __8bit_forceOpaque(token);
+          __8bit_reapplyScaleMode(doc.id);
+        }, t);
     }
   } catch (e) {
     console.warn("8bit-movement: post-update handler failed", e);
