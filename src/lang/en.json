@@ -27,5 +27,7 @@
   "8BITMOVEMENT.Settings-Warn_name": "Disable Warning Notification: ",
   "8BITMOVEMENT.Settings-Warn_hint": "When ticked the warning notification for missing images will be disabled.",
   "8BITMOVEMENT.Disable-Rotation-Animation_name": "Disable Rotation Animation: ",
-  "8BITMOVEMENT.Disable-Rotation-Animation_hint": "When ticked the rotation animation will be disabled."
+  "8BITMOVEMENT.Disable-Rotation-Animation_hint": "When ticked the rotation animation will be disabled.",
+  "8BITMOVEMENT.Disable-Selection-Border_name": "Hide Selection Border: ",
+  "8BITMOVEMENT.Disable-Selection-Border_hint": "When ticked the orange selection/hover border is hidden on tokens that have 8bit walk style configured."
 }

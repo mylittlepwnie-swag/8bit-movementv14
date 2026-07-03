@@ -44,6 +44,22 @@ export const registerSettings = function () {
     type: Boolean,
     requiresReload: true,
   });
+  game.settings.register("8bit-movement-frankhz", "disableSelectionBorder", {
+    name: game.i18n.format("8BITMOVEMENT.Disable-Selection-Border_name"),
+    hint: game.i18n.format("8BITMOVEMENT.Disable-Selection-Border_hint"),
+    scope: "world",
+    config: true,
+    default: false,
+    type: Boolean,
+    onChange: () => {
+      // Re-run the state refresh so borders hide/reappear without a reload.
+      for (const token of canvas?.tokens?.placeables ?? []) {
+        try {
+          token.renderFlags.set({ refreshState: true });
+        } catch {}
+      }
+    },
+  });
   game.settings.register("8bit-movement-frankhz", "disableRotationAnimation", {
     name: game.i18n.format("8BITMOVEMENT.Disable-Rotation-Animation_name"),
     hint: game.i18n.format("8BITMOVEMENT.Disable-Rotation-Animation_hint"),
