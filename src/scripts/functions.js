@@ -401,6 +401,18 @@ export async function addListener() {
       const next = pl?.document?.getFlag(MODULE_NAME, "__nextTexture");
       if (next) __8bit_previewMesh(pl.id, next);
     } catch {}
+    // Hide the selection/hover border on 8bit-configured tokens. Runs after
+    // every refresh, so it wins over core re-showing the border on state
+    // changes; disabling the setting lets the next refresh restore it.
+    try {
+      if (
+        pl?.border &&
+        pl.document?.flags?.[MODULE_NAME] &&
+        game.settings.get(MODULE_NAME, "disableSelectionBorder")
+      ) {
+        pl.border.visible = false;
+      }
+    } catch {}
   });
   const diagonalMode = game.settings.get(MODULE_NAME, "diagonalMode");
   Hooks.on("preUpdateToken", function changeImage(token, change) {
