@@ -31,6 +31,16 @@ Examples:
 
 Lowercase suffixes also work.
 
+## Installation
+
+Install from Foundry's **Install Module** dialog using this manifest URL:
+
+```
+https://github.com/mylittlepwnie-swag/8bit-movementv14/releases/latest/download/module.json
+```
+
+This points at the latest GitHub release, which contains a `module.zip` built with `module.json` at the archive root (the layout Foundry expects). Installing straight from a branch zip does not work because GitHub wraps branch archives in an extra folder.
+
 ## Setup
 
 Enable the module in a world, then configure the module settings from Foundry's Configure Settings dialog.
@@ -60,6 +70,16 @@ This module does not currently have an automated test suite. Useful checks befor
 - `node -e "JSON.parse(require('fs').readFileSync('src/lang/en.json','utf8'))"`
 
 Runtime behavior still needs to be checked in Foundry itself, especially Token HUD rendering, Token Config rendering, movement texture swaps, diagonal movement, and the optional `libWrapper` rotation wrapper.
+
+## Release process
+
+1. Bump `version` in `src/module.json` (and `package.json`) on `main`.
+2. Create and push a matching tag, e.g. `git tag v1.4.2 && git push origin v1.4.2`.
+3. Publish a GitHub release for that tag. The `Release` workflow (`.github/workflows/release.yml`) then:
+   - stamps the tag version and the version-specific download URL into `module.json`,
+   - zips the contents of `src/` into `module.zip` with `module.json` at the zip root,
+   - attaches `module.zip` and `module.json` to the release.
+4. Optionally publish to the Foundry package listing with the helper below.
 
 ## Release helper
 

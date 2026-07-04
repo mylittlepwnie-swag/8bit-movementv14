@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp version and download URL into module.json
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          repo_url="https://github.com/${GITHUB_REPOSITORY}"
+          jq --arg version "$version" \
+             --arg manifest "$repo_url/releases/latest/download/module.json" \
+             --arg download "$repo_url/releases/download/$tag/module.zip" \
+             '.version = $version | .manifest = $manifest | .download = $download' \
+             src/module.json > module.json.tmp
+          mv module.json.tmp src/module.json
+          cat src/module.json
+
+      - name: Build module.zip
+        run: |
+          cd src
+          zip -r ../module.zip .
+          cd ..
+          unzip -l module.zip
+
+      - name: Verify module.json is at the zip root
+        run: unzip -p module.zip module.json | jq -e '.id == "8bit-movement-frankhz"'
+
+      - name: Upload release assets
+        run: gh release upload "$GITHUB_REF_NAME" module.zip src/module.json --clobber
