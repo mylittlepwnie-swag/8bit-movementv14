@@ -172,14 +172,10 @@ function __8bit_queueTextureSwap(tokenDoc, change, src) {
 /**
  * Initialize directional image flags from the token's current texture.
  * If the filename contains a direction tag, sibling texture paths are inferred.
- * @param {string} tokenId Token ID to configure.
+ * @param {TokenDocument|PrototypeToken} tokenDocument Token document or prototype token to configure.
  */
-export async function initializeMovement(tokenId) {
+export async function initializeMovement(tokenDocument) {
   const diagonalMode = game.settings.get(MODULE_NAME, "diagonalMode");
-  // Resolve the document from the scene as well, because during createToken the
-  // canvas placeable may not be drawn yet.
-  const tokenDocument =
-    canvas.tokens.get(tokenId)?.document ?? canvas.scene?.tokens.get(tokenId);
   if (!tokenDocument) return;
   const imagePath = tokenDocument.texture.src.substring(
     tokenDocument.texture.src.lastIndexOf("/") + 1,
@@ -236,14 +232,13 @@ export async function initializeMovement(tokenId) {
 
 /**
  * Switch to a different outfit and precache its textures.
- * @param {string} tokenId Token ID.
+ * @param {TokenDocument|PrototypeToken} tokenDocument Token document or prototype token.
  * @param {string} outfitName Outfit name to switch to.
  */
-export async function switchOutfit(tokenId, outfitName) {
-  const token = canvas.tokens.get(tokenId);
-  if (!token) return;
+export async function switchOutfit(tokenDocument, outfitName) {
+  const doc = tokenDocument;
+  if (!doc) return;
 
-  const doc = token.document;
   const outfits = doc.getFlag(MODULE_NAME, "outfits") ?? {};
   const newOutfit = outfits[outfitName];
   if (!newOutfit) return;
@@ -270,14 +265,13 @@ export async function switchOutfit(tokenId, outfitName) {
 
 /**
  * Create a new outfit with empty direction images.
- * @param {string} tokenId Token ID.
+ * @param {TokenDocument|PrototypeToken} tokenDocument Token document or prototype token.
  * @param {string} outfitName New outfit name.
  */
-export async function addOutfit(tokenId, outfitName) {
-  const token = canvas.tokens.get(tokenId);
-  if (!token) return;
+export async function addOutfit(tokenDocument, outfitName) {
+  if (!tokenDocument) return;
 
-  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  const outfits = tokenDocument.getFlag(MODULE_NAME, "outfits") ?? {};
   if (outfits[outfitName]) return; // Already exists
 
   const newOutfit = {};
@@ -286,76 +280,73 @@ export async function addOutfit(tokenId, outfitName) {
   }
   outfits[outfitName] = newOutfit;
 
-  await token.document.setFlag(MODULE_NAME, "outfits", outfits);
+  await tokenDocument.setFlag(MODULE_NAME, "outfits", outfits);
 }
 
 /**
  * Remove an outfit.
- * @param {string} tokenId Token ID.
+ * @param {TokenDocument|PrototypeToken} tokenDocument Token document or prototype token.
  * @param {string} outfitName Outfit to remove.
  */
-export async function removeOutfit(tokenId, outfitName) {
-  const token = canvas.tokens.get(tokenId);
-  if (!token) return;
+export async function removeOutfit(tokenDocument, outfitName) {
+  if (!tokenDocument) return;
 
-  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  const outfits = tokenDocument.getFlag(MODULE_NAME, "outfits") ?? {};
   delete outfits[outfitName];
 
   // If we were on this outfit, switch to the first remaining one
-  const current = token.document.getFlag(MODULE_NAME, "currentOutfit");
+  const current = tokenDocument.getFlag(MODULE_NAME, "currentOutfit");
   if (current === outfitName) {
     const remaining = Object.keys(outfits)[0] ?? null;
-    await token.document.setFlag(MODULE_NAME, "currentOutfit", remaining);
+    await tokenDocument.setFlag(MODULE_NAME, "currentOutfit", remaining);
   }
 
-  await token.document.setFlag(MODULE_NAME, "outfits", outfits);
+  await tokenDocument.setFlag(MODULE_NAME, "outfits", outfits);
 }
 
 /**
  * Rename an outfit.
- * @param {string} tokenId Token ID.
+ * @param {TokenDocument|PrototypeToken} tokenDocument Token document or prototype token.
  * @param {string} oldName Current outfit name.
  * @param {string} newName New outfit name.
  */
-export async function renameOutfit(tokenId, oldName, newName) {
-  const token = canvas.tokens.get(tokenId);
-  if (!token) return;
+export async function renameOutfit(tokenDocument, oldName, newName) {
+  if (!tokenDocument) return;
 
-  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  const outfits = tokenDocument.getFlag(MODULE_NAME, "outfits") ?? {};
   if (!outfits[oldName] || outfits[newName]) return; // Invalid state
 
   outfits[newName] = outfits[oldName];
   delete outfits[oldName];
 
   // If we were on this outfit, update the current
-  const current = token.document.getFlag(MODULE_NAME, "currentOutfit");
+  const current = tokenDocument.getFlag(MODULE_NAME, "currentOutfit");
   if (current === oldName) {
-    await token.document.setFlag(MODULE_NAME, "currentOutfit", newName);
+    await tokenDocument.setFlag(MODULE_NAME, "currentOutfit", newName);
   }
 
-  await token.document.setFlag(MODULE_NAME, "outfits", outfits);
+  await tokenDocument.setFlag(MODULE_NAME, "outfits", outfits);
 }
 
 /**
  * Update a specific direction image in an outfit.
- * @param {string} tokenId Token ID.
+ * @param {TokenDocument|PrototypeToken} tokenDocument Token document or prototype token.
  * @param {string} outfitName Outfit name.
  * @param {string} direction Direction key (up, down, etc.).
  * @param {string} imagePath New image path.
  */
-export async function updateOutfitImage(tokenId, outfitName, direction, imagePath) {
-  const token = canvas.tokens.get(tokenId);
-  if (!token) return;
+export async function updateOutfitImage(tokenDocument, outfitName, direction, imagePath) {
+  if (!tokenDocument) return;
 
-  const outfits = token.document.getFlag(MODULE_NAME, "outfits") ?? {};
+  const outfits = tokenDocument.getFlag(MODULE_NAME, "outfits") ?? {};
   if (!outfits[outfitName]) return;
 
   outfits[outfitName][direction] = imagePath;
-  await token.document.setFlag(MODULE_NAME, "outfits", outfits);
+  await tokenDocument.setFlag(MODULE_NAME, "outfits", outfits);
 
   // Precache if this is the active outfit
-  if (token.document.getFlag(MODULE_NAME, "currentOutfit") === outfitName) {
-    await __8bit_precacheOutfit(token.document, outfitName);
+  if (tokenDocument.getFlag(MODULE_NAME, "currentOutfit") === outfitName) {
+    await __8bit_precacheOutfit(tokenDocument, outfitName);
   }
 }
 
@@ -370,13 +361,12 @@ Hooks.on("canvasReady", () => {
 
 /**
  * Open an image/video picker and save the selected path to a directional flag.
- * @param {string} tokenId Token ID to configure.
- * @param {object} sheet Token HUD or Token Config sheet to re-render.
+ * @param {TokenDocument|PrototypeToken} tokenDocument Token document or prototype token to configure.
+ * @param {object} sheet Token Config sheet to re-render.
  * @param {string} direction Directional flag key to update.
  * @param {string} outfitName Optional outfit name; if provided, updates the outfit instead of legacy flags.
  */
-export async function imageLoader(tokenId, sheet, direction, outfitName) {
-  const token = canvas.tokens.get(tokenId);
+export async function imageLoader(tokenDocument, sheet, direction, outfitName) {
   // v13 namespaced FilePicker and v14 removed the deprecated global, so resolve
   // the implementation from the new location and fall back to the global on v12.
   const FilePickerImpl =
@@ -386,9 +376,9 @@ export async function imageLoader(tokenId, sheet, direction, outfitName) {
     type: "imagevideo",
     callback: async (path) => {
       if (outfitName) {
-        await updateOutfitImage(tokenId, outfitName, direction, path);
+        await updateOutfitImage(tokenDocument, outfitName, direction, path);
       } else {
-        await token.document.setFlag(MODULE_NAME, direction, path);
+        await tokenDocument.setFlag(MODULE_NAME, direction, path);
       }
       sheet.render();
     },

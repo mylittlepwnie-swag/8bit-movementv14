@@ -54,7 +54,7 @@ Hooks.on("createToken", async function (tokenDocument, options, userId) {
   if (userId !== game.user.id) return;
   if (!game.settings.get(MODULE_NAME, "autoActivate")) return;
   if (Object.hasOwn(tokenDocument.flags ?? {}, MODULE_NAME)) return;
-  await initializeMovement(tokenDocument.id);
+  await initializeMovement(tokenDocument);
 });
 
 Hooks.on("renderTokenConfig", async function (sheet, element) {

@@ -89,8 +89,15 @@ export async function createConfigButtons(sheet, element) {
   if (game.settings.get(MODULE_NAME, "gmMode") && !game.user.isGM) return;
 
   const root = getHtmlElement(sheet, element);
-  const token = sheet.document ?? sheet.object;
-  if (!root || !token || token.documentName !== "Token") return;
+  // PrototypeTokenConfig has no document/object property — the prototype token
+  // is a data model on the actor, so fall back to actor.prototypeToken there.
+  // Use the actor's real prototype rather than sheet.token, which can be the
+  // app's transient preview clone whose changes are discarded on close.
+  const token =
+    sheet.document ?? sheet.object ?? sheet.actor?.prototypeToken;
+  const isPrototype =
+    foundry.data?.PrototypeToken && token instanceof foundry.data.PrototypeToken;
+  if (!root || !token || (!isPrototype && token.documentName !== "Token")) return;
 
   const appearanceTab =
     root.querySelector('.tab[data-tab="appearance"]') ??
@@ -191,7 +198,7 @@ export async function createConfigButtons(sheet, element) {
     );
     browseButton.tabIndex = -1;
     browseButton.addEventListener("click", async () => {
-      await imageLoader(token.id, sheet, direction, outfitName);
+      await imageLoader(token, sheet, direction, outfitName);
     });
 
     picker.append(input, browseButton);
@@ -207,14 +214,16 @@ export async function createConfigButtons(sheet, element) {
     previewImage.alt = title;
     previewButton.append(previewImage);
     previewButton.addEventListener("click", async () => {
-      await imageLoader(token.id, sheet, direction, outfitName);
+      await imageLoader(token, sheet, direction, outfitName);
     });
 
     wrapper.append(picker, previewButton);
     return wrapper;
   };
 
-  const uniquePrefix = sheet.options?.uniqueId ?? token.uuid ?? token.id;
+  // A PrototypeToken has no uuid/id of its own, so fall back to the app id.
+  const uniquePrefix =
+    sheet.options?.uniqueId ?? token.uuid ?? token.id ?? sheet.id;
 
   const addImagePickerGroup = (direction) => {
     createFormGroup(
@@ -238,7 +247,7 @@ export async function createConfigButtons(sheet, element) {
         "far fa-plus-square",
         "Activate",
         async () => {
-          await initializeMovement(token.id);
+          await initializeMovement(token);
           sheet.render();
         },
       ),
@@ -284,7 +293,7 @@ export async function createConfigButtons(sheet, element) {
       outfitSelect.append(option);
     }
     outfitSelect.addEventListener("change", async (e) => {
-      await switchOutfit(token.id, e.target.value);
+      await switchOutfit(token, e.target.value);
       sheet.render();
     });
     outfitSelectContainer.append(outfitSelect);
@@ -307,7 +316,7 @@ export async function createConfigButtons(sheet, element) {
         yes: async () => {
           const input = document.getElementById("outfit-name-input");
           const finalName = input?.value.trim() || newName;
-          await addOutfit(token.id, finalName);
+          await addOutfit(token, finalName);
           sheet.render();
         },
       });
@@ -368,7 +377,7 @@ export async function createConfigButtons(sheet, element) {
               title: "Delete Outfit",
               content: `Delete outfit "${currentOutfit}"?`,
               yes: async () => {
-                await removeOutfit(token.id, currentOutfit);
+                await removeOutfit(token, currentOutfit);
                 sheet.render();
               },
             });
@@ -393,7 +402,7 @@ export async function createConfigButtons(sheet, element) {
             rejectClose: true,
           });
           if (newName && newName.trim()) {
-            await renameOutfit(token.id, currentOutfit, newName.trim());
+            await renameOutfit(token, currentOutfit, newName.trim());
             sheet.render();
           }
         },
@@ -418,8 +427,10 @@ export async function createConfigButtons(sheet, element) {
   actions.className = "movement-actions";
   fieldset.append(actions);
 
+  // When editing the prototype itself there is nothing to "save to prototype",
+  // so always offer the clear action instead.
   actions.append(
-    token.getFlag(MODULE_NAME, "set")
+    isPrototype || token.getFlag(MODULE_NAME, "set")
       ? createActionButton(
           "remove",
           localize("8BITMOVEMENT.delete"),
