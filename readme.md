@@ -6,10 +6,10 @@ This fork is focused on Foundry Virtual Tabletop v13 and v14 compatibility. It h
 
 ## Features
 
-- Set directional token images from the Token HUD
-- Configure the same images from Token Config
+- Activates automatically on newly placed tokens (can be turned off)
+- Configure directional token images from the Token Config appearance tab
 - Auto-detect direction suffixes in filenames during setup
-- Optional diagonal support using `UL`, `UR`, `DL`, and `DR` from either setup UI
+- Optional diagonal support using `UL`, `UR`, `DL`, and `DR`
 - Save directional settings back to the actor's prototype token
 - Optional warning controls
 - Optional rotation animation override when `libWrapper` is active
@@ -45,13 +45,13 @@ This points at the latest GitHub release, which contains a `module.zip` built wi
 
 Enable the module in a world, then configure the module settings from Foundry's Configure Settings dialog.
 
-- **Token HUD mode** adds movement image buttons to the token HUD.
-- **Token Settings mode** adds the same movement image controls to the Token Config appearance tab.
+- **Auto-activate on token placement** activates the 8bit walk style on newly placed tokens automatically (on by default).
+- **Token Settings mode** adds the movement image controls to the Token Config appearance tab.
 - **Diagonal mode** enables four extra diagonal image slots.
 - **Only allow GM changes** restricts setup controls to GMs.
 - **Disable Rotation Animation** registers a `libWrapper` wrapper that suppresses Foundry's rotation animation during combined texture/rotation updates.
 
-To initialize a token, select it and click the activate button from the Token HUD or Token Config. If the current texture filename contains a direction suffix, the module infers sibling image paths. Otherwise, every direction starts with the current token texture and can be changed manually.
+Newly placed tokens are initialized automatically. Tokens placed while auto-activation is off can still be initialized manually with the activate button in the Token Config appearance tab. If the current texture filename contains a direction suffix, the module infers sibling image paths. Otherwise, every direction starts with the current token texture and can be changed manually.
 
 ## Current status
 
@@ -69,7 +69,7 @@ This module does not currently have an automated test suite. Useful checks befor
 - `node --check src/scripts/ui.js`
 - `node -e "JSON.parse(require('fs').readFileSync('src/lang/en.json','utf8'))"`
 
-Runtime behavior still needs to be checked in Foundry itself, especially Token HUD rendering, Token Config rendering, movement texture swaps, diagonal movement, and the optional `libWrapper` rotation wrapper.
+Runtime behavior still needs to be checked in Foundry itself, especially auto-activation on token placement, Token Config rendering, movement texture swaps, diagonal movement, and the optional `libWrapper` rotation wrapper.
 
 ## Release process
 

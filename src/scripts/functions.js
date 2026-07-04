@@ -176,10 +176,14 @@ function __8bit_queueTextureSwap(tokenDoc, change, src) {
  */
 export async function initializeMovement(tokenId) {
   const diagonalMode = game.settings.get(MODULE_NAME, "diagonalMode");
-  const token = canvas.tokens.get(tokenId);
-  const imagePath = token.document.texture.src.substring(
-    token.document.texture.src.lastIndexOf("/") + 1,
-    token.document.texture.src.lastIndexOf("."),
+  // Resolve the document from the scene as well, because during createToken the
+  // canvas placeable may not be drawn yet.
+  const tokenDocument =
+    canvas.tokens.get(tokenId)?.document ?? canvas.scene?.tokens.get(tokenId);
+  if (!tokenDocument) return;
+  const imagePath = tokenDocument.texture.src.substring(
+    tokenDocument.texture.src.lastIndexOf("/") + 1,
+    tokenDocument.texture.src.lastIndexOf("."),
   );
   let directions = [
     "up",
@@ -204,30 +208,30 @@ export async function initializeMovement(tokenId) {
   const outfitImages = {};
   if (!hasDirection) {
     for (const dir of ALL_DIRECTIONS) {
-      outfitImages[dir] = token.document.texture.src;
+      outfitImages[dir] = tokenDocument.texture.src;
     }
   } else {
-    outfitImages.up = token.document.texture.src.replace(hasDirection, directions[0]);
-    outfitImages.down = token.document.texture.src.replace(hasDirection, directions[1]);
-    outfitImages.left = token.document.texture.src.replace(hasDirection, directions[2]);
-    outfitImages.right = token.document.texture.src.replace(hasDirection, directions[3]);
+    outfitImages.up = tokenDocument.texture.src.replace(hasDirection, directions[0]);
+    outfitImages.down = tokenDocument.texture.src.replace(hasDirection, directions[1]);
+    outfitImages.left = tokenDocument.texture.src.replace(hasDirection, directions[2]);
+    outfitImages.right = tokenDocument.texture.src.replace(hasDirection, directions[3]);
     if (diagonalMode) {
-      outfitImages.UL = token.document.texture.src.replace(hasDirection, directions[8]);
-      outfitImages.UR = token.document.texture.src.replace(hasDirection, directions[9]);
-      outfitImages.DL = token.document.texture.src.replace(hasDirection, directions[10]);
-      outfitImages.DR = token.document.texture.src.replace(hasDirection, directions[11]);
+      outfitImages.UL = tokenDocument.texture.src.replace(hasDirection, directions[8]);
+      outfitImages.UR = tokenDocument.texture.src.replace(hasDirection, directions[9]);
+      outfitImages.DL = tokenDocument.texture.src.replace(hasDirection, directions[10]);
+      outfitImages.DR = tokenDocument.texture.src.replace(hasDirection, directions[11]);
     }
   }
 
   // Store as the "Default" outfit and set it as current
-  await token.document.update({
+  await tokenDocument.update({
     [`flags.${MODULE_NAME}.outfits`]: { Default: outfitImages },
     [`flags.${MODULE_NAME}.currentOutfit`]: "Default",
     lockRotation: true,
     rotation: 1,
   });
 
-  await __8bit_precacheOutfit(token.document, "Default");
+  await __8bit_precacheOutfit(tokenDocument, "Default");
 }
 
 /**
