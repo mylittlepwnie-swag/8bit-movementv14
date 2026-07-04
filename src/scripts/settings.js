@@ -8,14 +8,13 @@ export const registerSettings = function () {
     type: Boolean,
     requiresReload: true,
   });
-  game.settings.register("8bit-movement-frankhz", "tokenMode", {
-    name: game.i18n.format("8BITMOVEMENT.Token-Mode_name"),
-    hint: game.i18n.format("8BITMOVEMENT.Token-Mode_hint"),
+  game.settings.register("8bit-movement-frankhz", "autoActivate", {
+    name: game.i18n.format("8BITMOVEMENT.Auto-Activate_name"),
+    hint: game.i18n.format("8BITMOVEMENT.Auto-Activate_hint"),
     scope: "world",
     config: true,
     default: true,
     type: Boolean,
-    requiresReload: true,
   });
   game.settings.register("8bit-movement-frankhz", "settingsMode", {
     name: game.i18n.format("8BITMOVEMENT.Settings-Mode_name"),

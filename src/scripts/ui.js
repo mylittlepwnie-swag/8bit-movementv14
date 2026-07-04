@@ -16,30 +16,10 @@ const CARDINAL_DIRECTIONS = [
 ];
 
 const DIAGONAL_DIRECTIONS = [
-  {
-    key: "UL",
-    action: "up-left-image",
-    labelKey: "8BITMOVEMENT.up-left",
-    hudLabel: "UL",
-  },
-  {
-    key: "UR",
-    action: "up-right-image",
-    labelKey: "8BITMOVEMENT.up-right",
-    hudLabel: "UR",
-  },
-  {
-    key: "DL",
-    action: "down-left-image",
-    labelKey: "8BITMOVEMENT.down-left",
-    hudLabel: "DL",
-  },
-  {
-    key: "DR",
-    action: "down-right-image",
-    labelKey: "8BITMOVEMENT.down-right",
-    hudLabel: "DR",
-  },
+  { key: "UL", action: "up-left-image", labelKey: "8BITMOVEMENT.up-left" },
+  { key: "UR", action: "up-right-image", labelKey: "8BITMOVEMENT.up-right" },
+  { key: "DL", action: "down-left-image", labelKey: "8BITMOVEMENT.down-left" },
+  { key: "DR", action: "down-right-image", labelKey: "8BITMOVEMENT.down-right" },
 ];
 
 function localize(key) {
@@ -65,24 +45,6 @@ function getDirectionalImages(tokenDocument, fallbackImage) {
   for (const direction of [...CARDINAL_DIRECTIONS, ...DIAGONAL_DIRECTIONS]) {
     images[direction.key] =
       tokenDocument.getFlag(MODULE_NAME, direction.key) || fallbackImage;
-  }
-  return images;
-}
-
-function getActiveOutfitImages(tokenDocument, fallbackImage) {
-  const currentOutfit = tokenDocument.getFlag(MODULE_NAME, "currentOutfit");
-  const outfits = tokenDocument.getFlag(MODULE_NAME, "outfits") ?? {};
-
-  const outfit = currentOutfit && outfits[currentOutfit] ? outfits[currentOutfit] : null;
-  const images = {};
-
-  for (const direction of [...CARDINAL_DIRECTIONS, ...DIAGONAL_DIRECTIONS]) {
-    if (outfit) {
-      images[direction.key] = outfit[direction.key] || fallbackImage;
-    } else {
-      images[direction.key] =
-        tokenDocument.getFlag(MODULE_NAME, direction.key) || fallbackImage;
-    }
   }
   return images;
 }
@@ -120,189 +82,6 @@ async function savePrototypeSettings(tokenDocument, images) {
   });
 
   await tokenDocument.setFlag(MODULE_NAME, "set", true);
-}
-
-export async function createHudButtons(sheet, element) {
-  if (!game.settings.get(MODULE_NAME, "tokenMode")) return;
-  if (game.settings.get(MODULE_NAME, "gmMode") && !game.user.isGM) return;
-
-  const root = getHtmlElement(sheet, element);
-  const token = sheet.object ?? sheet.token;
-  const tokenDocument = sheet.document ?? token?.document;
-  if (!root || !token || !tokenDocument) return;
-
-  const middleColumn = root.querySelector(".col.middle");
-  if (!middleColumn || middleColumn.querySelector(".image-box")) return;
-
-  const imageBox = document.createElement("div");
-  imageBox.className = "image-box";
-  middleColumn.append(imageBox);
-
-  const createHudButton = (className, title, onClick, optionClass = "") => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `movement-icon${optionClass ? ` ${optionClass}` : ""}`;
-    button.dataset.action = className;
-    button.title = title;
-    button.setAttribute("aria-label", title);
-    button.addEventListener("click", onClick);
-    return button;
-  };
-
-  const appendActionButton = (
-    className,
-    title,
-    iconClass,
-    onClick,
-    optionClass = "option",
-  ) => {
-    const button = createHudButton(className, title, onClick, optionClass);
-    const icon = document.createElement("i");
-    icon.className = iconClass;
-    button.append(icon);
-    imageBox.append(button);
-  };
-
-  const appendImageButton = (className, title, src, onClick, label = "") => {
-    const button = createHudButton(className, title, onClick);
-
-    if (label) {
-      const labelElement = document.createElement("div");
-      labelElement.textContent = label;
-      button.append(labelElement);
-    }
-
-    const image = document.createElement("img");
-    image.src = src;
-    image.alt = title;
-    button.append(image);
-    imageBox.append(button);
-  };
-
-  if (!hasMovementFlags(tokenDocument)) {
-    appendActionButton(
-      "set-images",
-      localize("8BITMOVEMENT.activate"),
-      "far fa-plus-square",
-      async () => {
-        await initializeMovement(token.id);
-        sheet.render();
-      },
-      "option middle",
-    );
-    return;
-  }
-
-  if (tokenDocument.getFlag(MODULE_NAME, "locked")) {
-    appendActionButton(
-      "unlock-images",
-      localize("8BITMOVEMENT.unlock"),
-      "fas fa-lock",
-      async () => {
-        await tokenDocument.setFlag(MODULE_NAME, "locked", false);
-        sheet.render();
-      },
-      "option middle",
-    );
-    return;
-  }
-
-  const fallbackImage = tokenDocument.texture?.src ?? token.actor?.img ?? "";
-  const images = getActiveOutfitImages(tokenDocument, fallbackImage);
-  const outfits = tokenDocument.getFlag(MODULE_NAME, "outfits") ?? {};
-  const currentOutfit = tokenDocument.getFlag(MODULE_NAME, "currentOutfit");
-  const outfitList = Object.keys(outfits);
-
-  appendActionButton(
-    "lock-images",
-    localize("8BITMOVEMENT.lock"),
-    "fas fa-lock-open",
-    async () => {
-      await tokenDocument.setFlag(MODULE_NAME, "locked", true);
-      sheet.render();
-    },
-  );
-
-  // Outfit selector dropdown
-  if (outfitList.length > 1) {
-    const outfitSelectContainer = document.createElement("div");
-    outfitSelectContainer.className = "outfit-selector-hud";
-
-    const label = document.createElement("span");
-    label.className = "outfit-selector-label";
-    label.textContent = "Outfit:";
-    outfitSelectContainer.append(label);
-
-    const select = document.createElement("select");
-    select.className = "outfit-selector-select";
-    for (const outfit of outfitList) {
-      const option = document.createElement("option");
-      option.value = outfit;
-      option.textContent = outfit;
-      option.selected = outfit === currentOutfit;
-      select.append(option);
-    }
-    // The Token HUD sits over the canvas, so stop pointer events from bubbling
-    // down to the canvas (which would deselect the token / close the HUD).
-    for (const evt of ["pointerdown", "mousedown", "click"]) {
-      select.addEventListener(evt, (e) => e.stopPropagation());
-    }
-    select.addEventListener("change", async (e) => {
-      e.stopPropagation();
-      await switchOutfit(token.id, e.target.value);
-      sheet.render();
-    });
-    outfitSelectContainer.append(select);
-
-    imageBox.append(outfitSelectContainer);
-  }
-
-  for (const direction of CARDINAL_DIRECTIONS) {
-    appendImageButton(
-      direction.action,
-      localize(direction.labelKey),
-      images[direction.key],
-      async () => {
-        await imageLoader(token.id, sheet, direction.key, currentOutfit);
-      },
-    );
-  }
-
-  if (game.settings.get(MODULE_NAME, "diagonalMode")) {
-    for (const direction of DIAGONAL_DIRECTIONS) {
-      appendImageButton(
-        direction.action,
-        localize(direction.labelKey),
-        images[direction.key],
-        async () => {
-          await imageLoader(token.id, sheet, direction.key, currentOutfit);
-        },
-        direction.hudLabel,
-      );
-    }
-  }
-
-  if (tokenDocument.getFlag(MODULE_NAME, "set")) {
-    appendActionButton(
-      "remove-from-prototype",
-      localize("8BITMOVEMENT.delete"),
-      "fas fa-times",
-      async () => {
-        await clearPrototypeSettings(tokenDocument, images.down);
-        sheet.render();
-      },
-    );
-  } else {
-    appendActionButton(
-      "save-to-prototype",
-      localize("8BITMOVEMENT.save"),
-      "fas fa-address-card",
-      async () => {
-        await savePrototypeSettings(tokenDocument, images);
-        sheet.render();
-      },
-    );
-  }
 }
 
 export async function createConfigButtons(sheet, element) {

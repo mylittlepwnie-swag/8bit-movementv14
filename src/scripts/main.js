@@ -1,6 +1,6 @@
 import { registerSettings } from "./settings.js";
-import { addListener } from "./functions.js";
-import { createConfigButtons, createHudButtons } from "./ui.js";
+import { addListener, initializeMovement, MODULE_NAME } from "./functions.js";
+import { createConfigButtons } from "./ui.js";
 
 Hooks.on("init", () => {
   registerSettings();
@@ -47,8 +47,14 @@ Hooks.on("ready", async function () {
   addListener();
 });
 
-Hooks.on("renderTokenHUD", async function (sheet, element) {
-  createHudButtons(sheet, element);
+// Activate the 8bit walk style automatically when a token is placed, so the
+// per-token setup no longer has to be triggered by hand. Only the client that
+// created the token performs the update, so it runs exactly once.
+Hooks.on("createToken", async function (tokenDocument, options, userId) {
+  if (userId !== game.user.id) return;
+  if (!game.settings.get(MODULE_NAME, "autoActivate")) return;
+  if (Object.hasOwn(tokenDocument.flags ?? {}, MODULE_NAME)) return;
+  await initializeMovement(tokenDocument.id);
 });
 
 Hooks.on("renderTokenConfig", async function (sheet, element) {
