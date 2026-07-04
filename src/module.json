@@ -22,9 +22,9 @@
       "path": "lang/en.json"
     }
   ],
-  "manifest": "https://raw.githubusercontent.com/mylittlepwnie-swag/8bit-movementv14/main/src/module.json",
+  "manifest": "https://github.com/mylittlepwnie-swag/8bit-movementv14/releases/latest/download/module.json",
   "url": "https://github.com/mylittlepwnie-swag/8bit-movementv14",
-  "download": "https://github.com/mylittlepwnie-swag/8bit-movementv14/archive/refs/heads/main.zip",
+  "download": "https://github.com/mylittlepwnie-swag/8bit-movementv14/releases/download/v1.4.1/module.zip",
   "protected": false,
   "coreTranslation": false,
   "library": false,

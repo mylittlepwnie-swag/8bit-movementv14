@@ -63,7 +63,7 @@ function buildReleasePayload(moduleManifest, dryRun) {
     "dry-run": dryRun,
     release: {
       version: moduleManifest.version,
-      manifest: `https://raw.githubusercontent.com/${owner}/${repo}/${tag}/src/module.json`,
+      manifest: `https://github.com/${owner}/${repo}/releases/download/${tag}/module.json`,
       notes: `https://github.com/${owner}/${repo}/releases/tag/${tag}`,
       compatibility: {
         minimum: moduleManifest.compatibility?.minimum ?? "",
