@@ -89,9 +89,12 @@ export async function createConfigButtons(sheet, element) {
   if (game.settings.get(MODULE_NAME, "gmMode") && !game.user.isGM) return;
 
   const root = getHtmlElement(sheet, element);
-  const token = sheet.document ?? sheet.object;
-  // The prototype token setup edits a PrototypeToken data model, not a placed
-  // TokenDocument; accept both so the appearance-tab controls work in either.
+  // PrototypeTokenConfig has no document/object property — the prototype token
+  // is a data model on the actor, so fall back to actor.prototypeToken there.
+  // Use the actor's real prototype rather than sheet.token, which can be the
+  // app's transient preview clone whose changes are discarded on close.
+  const token =
+    sheet.document ?? sheet.object ?? sheet.actor?.prototypeToken;
   const isPrototype =
     foundry.data?.PrototypeToken && token instanceof foundry.data.PrototypeToken;
   if (!root || !token || (!isPrototype && token.documentName !== "Token")) return;
@@ -218,7 +221,9 @@ export async function createConfigButtons(sheet, element) {
     return wrapper;
   };
 
-  const uniquePrefix = sheet.options?.uniqueId ?? token.uuid ?? token.id;
+  // A PrototypeToken has no uuid/id of its own, so fall back to the app id.
+  const uniquePrefix =
+    sheet.options?.uniqueId ?? token.uuid ?? token.id ?? sheet.id;
 
   const addImagePickerGroup = (direction) => {
     createFormGroup(
@@ -422,8 +427,10 @@ export async function createConfigButtons(sheet, element) {
   actions.className = "movement-actions";
   fieldset.append(actions);
 
+  // When editing the prototype itself there is nothing to "save to prototype",
+  // so always offer the clear action instead.
   actions.append(
-    token.getFlag(MODULE_NAME, "set")
+    isPrototype || token.getFlag(MODULE_NAME, "set")
       ? createActionButton(
           "remove",
           localize("8BITMOVEMENT.delete"),
